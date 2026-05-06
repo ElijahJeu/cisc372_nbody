@@ -4,9 +4,9 @@
 #include "config.h"
 #include <cuda_runtime.h>
 
-// -------------------------
+
 // GPU kernels
-// -------------------------
+
 
 __global__ void pairwise_accel_kernel(vector3* pos, double* mass, vector3* accels, int n)
 {
@@ -67,17 +67,13 @@ __global__ void update_kernel(vector3* pos, vector3* vel, vector3* accels, int n
     }
 }
 
-// -------------------------
 // DEVICE POINTERS (global)
-// -------------------------
 static vector3 *d_pos = NULL;
 static vector3 *d_vel = NULL;
 static vector3 *d_accels = NULL;
 static double  *d_mass = NULL;
 
-// -------------------------
 // REQUIRED INTERFACE
-// -------------------------
 extern "C" void compute()
 {
     size_t size_pos = sizeof(vector3) * NUMENTITIES;
@@ -90,7 +86,7 @@ extern "C" void compute()
     cudaMalloc((void**)&d_mass, size_mass);
     cudaMalloc((void**)&d_accels, size_matrix);
 
-    // Copy host → device
+    // Copy host to  device
     cudaMemcpy(d_pos, hPos, size_pos, cudaMemcpyHostToDevice);
     cudaMemcpy(d_vel, hVel, size_pos, cudaMemcpyHostToDevice);
     cudaMemcpy(d_mass, mass, size_mass, cudaMemcpyHostToDevice);
@@ -112,7 +108,7 @@ extern "C" void compute()
     cudaMemcpy(hPos, d_pos, size_pos, cudaMemcpyDeviceToHost);
     cudaMemcpy(hVel, d_vel, size_pos, cudaMemcpyDeviceToHost);
 
-    // Free GPU memory (simple version — okay for project)
+    // Free GPU memory 
     cudaFree(d_pos);
     cudaFree(d_vel);
     cudaFree(d_mass);

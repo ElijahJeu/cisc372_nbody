@@ -4,7 +4,7 @@
 #include "vector.h"
 #include "config.h"
 
-// 1. The Kernels (These do the actual work on the GPU)
+// Kernels 
 __global__ void pairwise_accel_kernel(vector3* pos, double* mass, vector3* accels, int n) {
     int i = blockIdx.y * blockDim.y + threadIdx.y;
     int j = blockIdx.x * blockDim.x + threadIdx.x;
@@ -48,7 +48,6 @@ __global__ void update_kernel(vector3* pos, vector3* vel, vector3* accels, int n
     }
 }
 
-// 2. The Bridge Function (Tells the GPU to run the kernels)
 extern "C" {
     // These pointers are defined in nbody.c
     extern vector3 *d_hPos, *d_hVel, *d_accels;
@@ -61,7 +60,7 @@ extern "C" {
         // Calculate forces
         pairwise_accel_kernel<<<grid, block>>>(d_hPos, d_mass, d_accels, NUMENTITIES);
         
-        // Update physics (1D grid)
+        // physics
         int block1d = 256;
         int grid1d = (NUMENTITIES + block1d - 1) / block1d;
         update_kernel<<<grid1d, block1d>>>(d_hPos, d_hVel, d_accels, NUMENTITIES);
