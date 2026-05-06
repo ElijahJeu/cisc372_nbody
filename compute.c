@@ -2,30 +2,38 @@
 #include <math.h>
 #include "vector.h"
 #include "config.h"
-#include <cuda.h>
 #include <cuda_runtime.h>
 
+// -------------------------
+// GPU kernels
+// -------------------------
 
-__global__ void pairwise_accel_kernel(vector3* pos, double* mass, vector3* accels, int n) {
-    // 1. Determine which 'i' and 'j' this specific thread is responsible for
+__global__ void pairwise_accel_kernel(vector3* pos, double* mass, vector3* accels, int n)
+{
     int i = blockIdx.y * blockDim.y + threadIdx.y;
     int j = blockIdx.x * blockDim.x + threadIdx.x;
 
-    // 2. Make sure we aren't going out of bounds of our array
-    if (i < n && j < n) {
-        int index = i * n + j; // Flat indexing for our matrix
+    if (i < n && j < n)
+    {
+        int index = i * n + j;
 
-        if (i == j) {
+        if (i == j)
+        {
             accels[index][0] = 0;
             accels[index][1] = 0;
             accels[index][2] = 0;
-        } else {
+        }
+        else
+        {
             vector3 distance;
             distance[0] = pos[i][0] - pos[j][0];
             distance[1] = pos[i][1] - pos[j][1];
             distance[2] = pos[i][2] - pos[j][2];
 
-            double mag_sq = distance[0]*distance[0] + distance[1]*distance[1] + distance[2]*distance[2];
+            double mag_sq = distance[0]*distance[0] +
+                            distance[1]*distance[1] +
+                            distance[2]*distance[2];
+
             double mag = sqrt(mag_sq);
             double accelmag = -1.0 * GRAV_CONSTANT * mass[j] / mag_sq;
 
@@ -58,21 +66,55 @@ __global__ void update_kernel(vector3* pos, vector3* vel, vector3* accels, int n
         }
     }
 }
-//compute: Updates the positions and locations of the objects in the system based on gravity.
-//Parameters: None
-//Returns: None
-//Side Effect: Modifies the hPos and hVel arrays with the new positions and accelerations after 1 INTERVAL
-void compute(vector3* d_pos, vector3* d_vel, double* d_mass, vector3* d_accels)
+
+// -------------------------
+// DEVICE POINTERS (global)
+// -------------------------
+static vector3 *d_pos = NULL;
+static vector3 *d_vel = NULL;
+static vector3 *d_accels = NULL;
+static double  *d_mass = NULL;
+
+// -------------------------
+// REQUIRED INTERFACE
+// -------------------------
+extern "C" void compute()
 {
+    size_t size_pos = sizeof(vector3) * NUMENTITIES;
+    size_t size_mass = sizeof(double) * NUMENTITIES;
+    size_t size_matrix = sizeof(vector3) * NUMENTITIES * NUMENTITIES;
+
+    // Allocate once (simple version for assignment)
+    cudaMalloc((void**)&d_pos, size_pos);
+    cudaMalloc((void**)&d_vel, size_pos);
+    cudaMalloc((void**)&d_mass, size_mass);
+    cudaMalloc((void**)&d_accels, size_matrix);
+
+    // Copy host → device
+    cudaMemcpy(d_pos, hPos, size_pos, cudaMemcpyHostToDevice);
+    cudaMemcpy(d_vel, hVel, size_pos, cudaMemcpyHostToDevice);
+    cudaMemcpy(d_mass, mass, size_mass, cudaMemcpyHostToDevice);
+
+    // Launch kernels
     dim3 block(16,16);
     dim3 grid((NUMENTITIES+15)/16, (NUMENTITIES+15)/16);
 
     pairwise_accel_kernel<<<grid, block>>>(d_pos, d_mass, d_accels, NUMENTITIES);
 
-    int block1 = 256;
-    int grid1 = (NUMENTITIES + block1 - 1) / block1;
+    int block1d = 256;
+    int grid1d = (NUMENTITIES + block1d - 1) / block1d;
 
-    update_kernel<<<grid1, block1>>>(d_pos, d_vel, d_accels, NUMENTITIES);
+    update_kernel<<<grid1d, block1d>>>(d_pos, d_vel, d_accels, NUMENTITIES);
 
     cudaDeviceSynchronize();
+
+    // Copy back results
+    cudaMemcpy(hPos, d_pos, size_pos, cudaMemcpyDeviceToHost);
+    cudaMemcpy(hVel, d_vel, size_pos, cudaMemcpyDeviceToHost);
+
+    // Free GPU memory (simple version — okay for project)
+    cudaFree(d_pos);
+    cudaFree(d_vel);
+    cudaFree(d_mass);
+    cudaFree(d_accels);
 }

@@ -1,6 +1,8 @@
-FLAGS = -DDEBUG
-LIBS = -lm
 NVCC = nvcc
+
+LIBS = -lm
+
+FLAGS = -DDEBUG -O3 -Xcompiler -std=c99
 
 all: nbody
 
@@ -14,4 +16,4 @@ compute.o: compute.cu config.h vector.h compute.h
 	$(NVCC) $(FLAGS) -c compute.cu
 
 clean:
-	rm -f *.o nbody 
+	rm -f *.o nbody

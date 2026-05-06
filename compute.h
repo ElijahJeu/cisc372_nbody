@@ -1,1 +1,14 @@
-void compute(vector3*, vector3*, double*, vector3*);
+#ifndef COMPUTE_H
+#define COMPUTE_H
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+void compute();
+
+#ifdef __cplusplus
+}
+#endif
+
+#endif
