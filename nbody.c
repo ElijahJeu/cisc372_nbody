@@ -88,28 +88,55 @@ void printSystem(FILE* handle){
 		fprintf(handle,"),m=%lf\n",mass[i]);
 	}
 }
+vector3 *d_hPos, *d_hVel, *d_accels;
+double *d_mass;
+vector3 *d_hPos, *d_hVel, *d_accels;
+double *d_mass;
+//GLOBAL GPU POINTERS
+vector3 *d_pos, *d_vel, *d_accels;
+double *d_mass;
+
+vector3 *hPos, *hVel;
+double *mass;
 
 int main(int argc, char **argv)
 {
-	clock_t t0=clock();
-	int t_now;
-	//srand(time(NULL));
-	srand(1234);
-	initHostMemory(NUMENTITIES);
-	planetFill();
-	randomFill(NUMPLANETS + 1, NUMASTEROIDS);
-	//now we have a system.
-	#ifdef DEBUG
-	printSystem(stdout);
-	#endif
-	for (t_now=0;t_now<DURATION;t_now+=INTERVAL){
-		compute();
-	}
-	clock_t t1=clock()-t0;
-#ifdef DEBUG
-	printSystem(stdout);
-#endif
-	printf("This took a total time of %f seconds\n",(double)t1/CLOCKS_PER_SEC);
+    srand(1234);
 
-	freeHostMemory();
+    initHostMemory(NUMENTITIES);
+    planetFill();
+    randomFill(NUMPLANETS + 1, NUMASTEROIDS);
+
+    size_t size_pos = sizeof(vector3) * NUMENTITIES;
+    size_t size_mass = sizeof(double) * NUMENTITIES;
+    size_t size_matrix = sizeof(vector3) * NUMENTITIES * NUMENTITIES;
+
+    // 🧠 allocate ONCE
+    cudaMalloc(&d_pos, size_pos);
+    cudaMalloc(&d_vel, size_pos);
+    cudaMalloc(&d_mass, size_mass);
+    cudaMalloc(&d_accels, size_matrix);
+
+    // initial copy
+    cudaMemcpy(d_pos, hPos, size_pos, cudaMemcpyHostToDevice);
+    cudaMemcpy(d_vel, hVel, size_pos, cudaMemcpyHostToDevice);
+    cudaMemcpy(d_mass, mass, size_mass, cudaMemcpyHostToDevice);
+
+    for (int t = 0; t < DURATION; t += INTERVAL)
+    {
+        compute(d_pos, d_vel, d_mass, d_accels);
+    }
+
+    // copy results back
+    cudaMemcpy(hPos, d_pos, size_pos, cudaMemcpyDeviceToHost);
+    cudaMemcpy(hVel, d_vel, size_pos, cudaMemcpyDeviceToHost);
+
+    cudaFree(d_pos);
+    cudaFree(d_vel);
+    cudaFree(d_mass);
+    cudaFree(d_accels);
+
+    freeHostMemory();
+
+    return 0;
 }

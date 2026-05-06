@@ -1,1 +1,1 @@
-void compute();
+void compute(vector3*, vector3*, double*, vector3*);
